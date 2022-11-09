@@ -1,0 +1,372 @@
+Награды
+Пока точных данных нет, но будут.
+
+Системные требования
+4 CPU 16 RAM 200 SSD
+
+Используемые порты: 26657,26656,6060,9090,9091 tcp
+
+Подготовка сервера
+Обновим пакеты системы:
+
+sudo apt update && sudo apt upgrade -y
+Установим необходимое программное обеспечение:
+
+sudo apt install curl chrony tar wget clang pkg-config libssl-dev libleveldb-dev jq build-essential bsdmainutils git make ncdu htop screen unzip bc htop mc -y
+Установка GO:
+
+cd $HOME && \
+ver="1.19.2" && \
+wget "https://golang.org/dl/go$ver.linux-amd64.tar.gz" && \
+sudo rm -rf /usr/local/go && \
+sudo tar -C /usr/local -xzf "go$ver.linux-amd64.tar.gz" && \
+rm "go$ver.linux-amd64.tar.gz" && \
+echo "export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin" >> $HOME/.bash_profile && \
+source $HOME/.bash_profile && \
+go version
+Начало установки ноды:
+Установка переменных:
+
+# Введите номер космос ноды на вашем сервере (0, если первая установка) 
+# По умолчанию: NODES_NUM="0" 
+NODES_NUM="0"
+
+MONIKER=""
+WALLET=""
+WEBSITE=""
+IDENTITY="C545A7956743736E"
+DETAILS=""
+SECURITY_CONTACT=""
+
+# Ниже менять не нужно
+
+TIKER=defundd && \
+CHAIN=defund-private-3 && \
+TOKEN=ufetf && \
+PROJECT=defund && \
+CONFIG=.defund && \
+DENOM=1000000 && \
+PROJECT_REPOSITORY_PATH="https://github.com/defund-labs/defund" && \
+BRANCH="v0.1.0" && \
+NODE="http://localhost:$((NODES_NUM+26))657"
+
+Экспорт переменных:
+
+echo "export MONIKER=$MONIKER" >> $HOME/.bash_profile && \
+echo "export WALLET=$WALLET" >> $HOME/.bash_profile && \
+echo "export WEBSITE=$WEBSITE" >> $HOME/.bash_profile && \
+echo "export IDENTITY=$IDENTITY" >> $HOME/.bash_profile && \
+echo "export DETAILS=$DETAILS" >> $HOME/.bash_profile && \
+echo "export SECURITY_CONTACT=$SECURITY_CONTACT" >> $HOME/.bash_profile && \
+echo "export NODES_NUM=$NODES_NUM" >> $HOME/.bash_profile && \
+echo "export TIKER=$TIKER" >> $HOME/.bash_profile && \
+echo "export CHAIN=$CHAIN" >> $HOME/.bash_profile && \
+echo "export TOKEN=$TOKEN" >> $HOME/.bash_profile && \
+echo "export PROJECT=$PROJECT" >> $HOME/.bash_profile && \
+echo "export CONFIG=$CONFIG" >> $HOME/.bash_profile && \
+echo "export PROJECT_REPOSITORY_PATH=$PROJECT_REPOSITORY_PATH" >> $HOME/.bash_profile && \
+echo "export BRANCH=$BRANCH" >> $HOME/.bash_profile && \
+echo "export NODE=$NODE" >> $HOME/.bash_profile && \
+source $HOME/.bash_profile
+Установка бинарников:
+
+git clone $PROJECT_REPOSITORY_PATH $PROJECT && \
+cd $PROJECT && \
+git checkout $BRANCH && \
+make install && \
+$TIKER version
+# 0.1.0
+Инициализация:
+
+$TIKER init $MONIKER --chain-id $CHAIN && \
+$TIKER config chain-id $CHAIN && \
+$TIKER config keyring-backend test && \
+$TIKER config node $NODE
+Добавить кошелек:
+
+# Add wallet 
+$TIKER keys add $WALLET
+# Or recover
+$TIKER keys add $WALLET --recover
+Дополнительные переменные:
+
+VALOPER=$($TIKER keys show $WALLET --bech val -a) && \
+ADDRESS=$($TIKER keys show $WALLET --address) && \
+echo "export VALOPER=$VALOPER" >> $HOME/.bash_profile && \
+echo "export ADDRESS=$ADDRESS" >> $HOME/.bash_profile && \
+source $HOME/.bash_profile
+Пиры и сиды:
+
+PEERS="d9184a3a61c56b803c7b317cd595e83bbae3925e@194.163.174.231:26677,5e7853ec4f74dba1d3ae721ff9f50926107efc38@65.108.6.45:60556,f114c02efc5aa7ee3ee6733d806a1fae2fbfb66b@65.108.46.123:56656,aa2c9df37e372c7928435075497fb0fb7ff9427e@38.129.16.18:26656,f2985029a48319330b99767d676412383e7061bf@194.163.155.84:36656,daff7b8cbcae4902c3c4542113ba521f968cc3f8@213.239.217.52:29656"
+SEEDS="85279852bd306c385402185e0125dffeed36bf22@38.146.3.194:26656,09ce2d3fc0fdc9d1e879888e7d72ae0fefef6e3d@65.108.105.48:11256"
+sed -i.bak -e "s/^persistent_peers *=.*/persistent_peers = \"$PEERS\"/; s/^seeds *=.*/seeds = \"$SEEDS\"/" $HOME/$CONFIG/config/config.toml
+Настраиваем фильтрацию "плохих" peers:
+
+sed -i.bak -e "s/^filter_peers *=.*/filter_peers = \"true\"/" $HOME/$CONFIG/config/config.toml
+При необходимости увеличиваем количество входящих и исходящих пиров для подключения. Это может помочь при падении ноды, но увеличит нагрузку.
+
+sed -i.bak 's/max_num_inbound_peers =.*/max_num_inbound_peers = 50/g' $HOME/$CONFIG/config/config.toml 
+sed -i.bak 's/max_num_outbound_peers =.*/max_num_outbound_peers = 50/g' $HOME/$CONFIG/config/config.toml
+Настроим внешний IP address (не забывайте сменить порт, если нода не первая:
+
+external_address=$(wget -qO- eth0.me)
+nodeport=$((NODES_NUM+26))656
+sed -i.bak -e "s/^external_address *=.*/external_address = \"$external_address:$nodeport\"/" $HOME/$CONFIG/config/config.toml
+Настраиваем минимальную цену за газ в app.toml 
+
+min_gas=0.0025
+sed -i.bak -e "s/^minimum-gas-prices *=.*/minimum-gas-prices = \"$min_gas$TOKEN\"/;" $HOME/$CONFIG/config/app.toml
+Скачать генезис:
+
+wget -O defund-private-3-gensis.tar.gz https://github.com/defund-labs/testnet/raw/main/defund-private-3/defund-private-3-gensis.tar.gz
+sudo tar -xvzf defund-private-3-gensis.tar.gz -C $HOME/.defund/config
+rm defund-private-3-gensis.tar.gz
+Проверить хеш сумму:
+
+sha256sum $HOME/$CONFIG/config/genesis.json
+# bec32034b1ca130e2f45c603f42103490df990984fb46528994b4a99a5f77ea6
+Смена портов для космос нод:
+# Set number of Cosmos nodes on your server (0, if it's first)
+NODES_NUM="0" указаны в $HOME/.bash_profile
+
+# We recommend maximum 4 Cosmos Nodes on 1 cloud
+# Example: 
+
+# ONE COMMAND
+sed -i.bak -e "\
+s%^proxy_app = \"tcp://127.0.0.1:26658\"%proxy_app = \"tcp://127.0.0.1:$((NODES_NUM+26))658\"%; \
+s%^laddr = \"tcp://127.0.0.1:26657\"%laddr = \"tcp://127.0.0.1:$((NODES_NUM+26))657\"%; \
+s%^pprof_laddr = \"localhost:6060\"%pprof_laddr = \"localhost:$((NODES_NUM+6))060\"%; \
+s%^laddr = \"tcp://0.0.0.0:26656\"%laddr = \"tcp://0.0.0.0:$((NODES_NUM+26))656\"%; \
+s%^external_address = \"\"%external_address = \"`echo $(wget -qO- eth0.me):$((NODES_NUM+26))656`\"%; \
+s%^prometheus_listen_addr = \":26660\"%prometheus_listen_addr = \":$((NODES_NUM+26))660\"%" $HOME/$CONFIG/config/config.toml
+
+# ONE COMMAND
+sed -i.bak -e "\
+s%^address = \"tcp://0.0.0.0:1317\"%address = \"tcp://0.0.0.0:$((NODES_NUM+1))317\"%; \
+s%^address = \":8080\"%address = \":$((NODES_NUM+8))080\"%; \
+s%^address = \"0.0.0.0:9090\"%address = \"0.0.0.0:$((NODES_NUM+9))090\"%; \
+s%^address = \"0.0.0.0:9091\"%address = \"0.0.0.0:$((NODES_NUM+9))091\"%" $HOME/$CONFIG/config/app.toml
+
+# ONE COMMAND
+$TIKER config node $NODE
+Посмотреть какой порт нужно открыть в фаерволе:
+
+echo "Вам нужно открыть порт: $((NODES_NUM+26))656 TCP"
+Оптимизация места на диске:
+
+indexer="null" && \
+snapshot_interval="0" && \
+pruning="custom" && \
+pruning_keep_recent="100" && \
+pruning_keep_every="0" && \
+pruning_interval="10" && \
+sed -i.bak -e "s/^indexer *=.*/indexer = \"$indexer\"/" $HOME/$CONFIG/config/config.toml && \
+sed -i.bak -e "s/^snapshot-interval *=.*/snapshot-interval = \"$snapshot_interval\"/" $HOME/$CONFIG/config/app.toml && \
+sed -i.bak -e "s/^pruning *=.*/pruning = \"$pruning\"/" $HOME/$CONFIG/config/app.toml && \
+sed -i.bak -e "s/^pruning-keep-recent *=.*/pruning-keep-recent = \"$pruning_keep_recent\"/" $HOME/$CONFIG/config/app.toml && \
+sed -i.bak -e "s/^pruning-keep-every *=.*/pruning-keep-every = \"$pruning_keep_every\"/" $HOME/$CONFIG/config/app.toml && \
+sed -i.bak -e "s/^pruning-interval *=.*/pruning-interval = \"$pruning_interval\"/" $HOME/$CONFIG/config/app.toml
+Создание службы и запуск ноды:
+
+# Create service | ONE COMMAND
+sudo tee /etc/systemd/system/$TIKER.service > /dev/null <<EOF
+[Unit]
+Description=$PROJECT Node
+After=network.target
+
+[Service]
+User=$USER
+Type=simple
+ExecStart=$(which $TIKER) start
+Restart=on-failure
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+EOF
+Запуск службы:
+
+sudo systemctl daemon-reload && \
+sudo systemctl enable $TIKER && \
+sudo systemctl restart $TIKER
+Проверка логов:
+
+sudo journalctl -u $TIKER -f -o cat
+Дождитесь пока нода синхронизируется, ответ команды ниже должен быть false:
+
+curl -s $NODE/status | jq .result.sync_info.catching_up
+Создание валидатора:
+Запросите тестовые токены в дискорде проекта в ветке #faucet
+
+Адрес можно посмотреть командой:
+
+echo $ADDRESS
+Убедитесь что баланс кошелька пополнен:
+
+$TIKER q bank balances $ADDRESS
+Теперь создайте валидатора:
+
+# You can change the amount for your own. 1 token is 1000000. You need minimum 1 token for creating.
+# You can change the commission-rate for your own. 5% is 0.05
+$TIKER tx staking create-validator \
+  --amount=1000000$TOKEN \
+  --pubkey=$($TIKER tendermint show-validator) \
+  --moniker=$MONIKER \
+  --chain-id=$CHAIN \
+  --commission-rate="0.10" \
+  --commission-max-rate="0.20" \
+  --commission-max-change-rate="0.05" \
+  --min-self-delegation=$DENOM \
+  --fees=500$TOKEN \
+  --from=$WALLET \
+  --identity=$IDENTITY \
+  --website=$WEBSITE \
+  --details=$DETAILS \
+  --security-contact=$SECURITY_CONTACT \
+  -y
+Сделайте бэкап ключа валидатора:
+
+mkdir -p /home/$PROJECT/
+cp $HOME/$CONFIG/config/priv_validator_key.json /home/$PROJECT/
+Обновить ноду:
+# Example: v1.0.0
+TAG_NAME=
+BRANCH_NAME=
+
+sudo systemctl stop $TIKER && \
+cd $PROJECT && \
+git pull; \
+git checkout tags/$TAG_NAME -b $BRANCH_NAME && \
+make clean; \
+make install && \
+sudo systemctl restart $TIKER && \
+journalctl -u $TIKER -f -o cat
+Удалить ноду:
+# SAVE YOUR $HOME/$CONFIG/config/priv_validator_key.json 
+
+sudo systemctl stop $TIKER && \
+sudo systemctl disable $TIKER; \
+sudo rm /etc/systemd/system/$TIKER.service; \
+sudo systemctl daemon-reload && \
+cd $HOME && \
+rm -rf $CONFIG $PROJECT; \
+sudo rm $(which $TIKER)
+Полезные команды:
+Статус ноды
+# Логи службы ноды
+journalctl -u $TIKER -f -o cat
+
+# Управление службами
+systemctl status $TIKER
+systemctl stop $TIKER
+systemctl start $TIKER
+systemctl restart $TIKER
+
+# Проверить статус ноды
+$TIKER status | jq
+
+# Статус синхронизации ноды: false, значит синхронизирована
+curl -s $NODE/status | jq .result.sync_info.catching_up
+
+# Посмотреть consensus (AFTER START)
+curl -s $NODE/consensus_state  | jq '.result.round_state.height_vote_set[0].prevotes_bit_array'
+
+# Количество подключенных пиров
+curl -s $NODE/net_info | jq -r '.result.peers[] | "\(.node_info.id)@\(.remote_ip):\(.node_info.listen_addr | split(":")[2])"' | wc -l
+
+# Список моникеров подключенных peers
+curl -s $NODE/net_info | jq '.result.peers[].node_info.moniker'
+
+# Jail, tombstoned, start_height, index_offset
+$TIKER q slashing signing-info $($TIKER tendermint show-validator)
+
+# Узнать ваш пир (e.g. 72cc19c8435d662677b2ea627e649f39b5bc8abb@5.161.70.110:26656
+echo "$($TIKER tendermint show-node-id)@$(curl ifconfig.me):$(curl -s $NODE/status | jq -r '.result.node_info.listen_addr' | cut -d':' -f3)"
+Кошельки
+# Посмотреть адрес кошелька
+echo $ADDRESS
+
+# Get eth wallet private key
+$TIKER keys unsafe-export-eth-key $WALLET
+
+# Проверить баланс кошелька
+$TIKER q bank balances $ADDRESS
+
+# Отправка токенов 1 token = 1000000 (Cosmos)
+$TIKER tx bank send $WALLET <ADDRESS_TO> <TOKENS_COUNT>$TOKEN --fees 500$TOKEN
+
+# Создать кошелек
+$TIKER keys add $WALLET
+
+# Восстановить кошелек
+$TIKER keys add $WALLET --recover
+
+# Удалить кошелек
+$TIKER keys delete $WALLET
+! Если транзакции не отправляются с ошибкой account sequence mismatch, expected 18, got 17: incorrect account sequence, то добавьте в команду ключ -s 18 (номер замените на тот, который ждет sequence)
+
+Голосование
+# Проголосовать
+id_prop= 
+$TIKER tx gov vote $id_prop <yes|no> --from $WALLET --fees 500$TOKEN -y
+
+# Check all voted proposals
+$TIKER q gov proposals --voter $ADDRESS
+
+# Создать предложение (простой пример)
+$TIKER tx gov submit-proposal --title="Text" \ --type="Text" \ --description="Text" \ --from $WALLET \ --chain-id=$CHAIN \ --gas=auto --gas-adjustment 1.5 --fees 500$TOKEN
+
+# Внести депозит в предложение, для запуска голосования
+id_prop= 
+$TIKER tx gov deposit $id_prop 1000$TOKEN \ --from=$WALLET \ --chain-id=$CHAIN \ --gas=auto --gas-adjustment=1.5 --fees 500$TOKEN
+Действия с валидатором
+# Получить адрес валидатора (valoper)
+echo $VALOPER
+
+# Изменить валидатора
+$TIKER tx staking edit-validator --website="<YOUR_WEBSITE>" --details="<YOUR_DESCRIPTION>" --moniker="<YOUR_NEW_MONIKER>" --from=$WALLET --fees 500$TOKEN
+
+# Выйти из тютьмы
+$TIKER tx slashing unjail --from $WALLET --fees 500$TOKEN
+
+# Bond more tokens (if you want increase your validator stake you should bond more to your valoper address):
+$TIKER tx staking delegate $VALOPER <TOKENS_COUNT>$TOKEN --from $WALLET --fees 500$TOKEN -y
+
+# Undelegate
+$TIKER tx staking unbond $VALOPER <TOKENS_COUNT>$TOKEN --from $WALLET --fees 500$TOKEN -y
+
+# Ределегировать награды на другого валидатора
+$TIKER tx staking redelegate <src-validator-addr> <dst-validator-addr> 1000000$TOKEN --from $WALLET --fees 500$TOKEN -y
+
+# собрать реварды со всех валидаторов, которым делегировали (без комиссии) 
+# Take rewards from all walidators without commission
+$TIKER tx distribution withdraw-all-rewards --from $WALLET --fees 500$TOKEN -y 
+
+# собрать реварды + комиссию со своего или другого валидатора 
+# Take rewards and commission from your validator
+$TIKER tx distribution withdraw-rewards $VALOPER --from $WALLET --fees 500$TOKEN --commission -y
+
+# Reset private validator file to genesis state and delete addrbook.json
+$TIKER tendermint unsafe-reset-all --home $HOME/$CONFIG
+
+## All validators info
+# List of all active validators | ONE COMMAND
+$TIKER q staking validators -o json --limit=1000 \
+| jq '.validators[] | select(.status=="BOND_STATUS_BONDED")' \
+| jq -r '.tokens + " - " + .description.moniker' \
+| sort -gr | nl
+
+# List of all inactive validators | ONE COMMAND
+$TIKER q staking validators -o json --limit=1000 \
+| jq '.validators[] | select(.status=="BOND_STATUS_UNBONDED")' \
+| jq -r '.tokens + " - " + .description.moniker' \
+| sort -gr | nl
+
+# Посмотреть Vote Power:
+curl -s $NODE/consensus_state | jq '.result.round_state.height_vote_set[0].prevotes_bit_array'
+
+# параметры сети
+# Network options
+$TIKER q staking params 
+$TIKER q slashing params
